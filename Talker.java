@@ -9,17 +9,19 @@ public class Talker {
     // Requirements for the talker
     // Accept a string of up to 50 characters entered in cmd line OK
     // Break up the string into messages of 10 characters (so 5 messages) OK
-    // Each message should be numbered in order OK
-    // Message 0 is gonna contain the number of messages sent OK
+    // Each message should be numbered in order UNTESTED
+    // Message 0 is gonna contain the number of messages sent UNTESTED
     // Talker must wait for a listener to request a UDP connection then accept it OK
-    // Talker should then request a UDP connection to the listener, to get ACK OK
-    // Ports for Talker and Listener should be entered in cmd line OK
-    // Talker should extract listener's IP address to request UDP connection OK
-    // Talker should send each message to the listener using UDP OK
+    // Talker should then request a UDP connection to the listener, to get ACK
+    // UNTESTED
+    // Ports for Talker and Listener should be entered in cmd line UNTESTED
+    // Talker should extract listener's IP address to request UDP connection
+    // UNTESTED
+    // Talker should send each message to the listener using UDP UNTESTED
     // Talker may only send a new message only if it has received an ACK for the
-    // previous message
+    // previous message UNTESTED
     // Talker should wait for a timeout of 2 seconds for an ACK before resending the
-    // message
+    // message UNTESTED
     public static void main(String[] args) {
         // Check if the user has entered the message and ports for talker and listener
         if (args.length != 3) {
@@ -39,6 +41,10 @@ public class Talker {
 
         // Break up the message into 10 character messages
         String[] messages = processMessage(message);
+        // Loop to print messages:
+        // for (int i = 0; i < messages.length; i++) {
+        // System.out.println(messages[i]);
+        // }
         DatagramSocket socket = null;
         boolean Acked = false;
 
@@ -53,30 +59,31 @@ public class Talker {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             // Wait for the listener to send a UDP packet
             socket.receive(packet);
+            String messageRecieved = new String(packet.getData(), packet.getOffset(), packet.getLength());
+            System.out.println("Recieved request from listener " + messageRecieved);
 
             // Get the listener's IP address
             String listenerAddress = packet.getAddress().getHostAddress();
             System.out.println("Listener's IP address: " + listenerAddress);
 
             // Send a UDP packet to the listener to request a connection
-            String request = "Requesting UDP connection";
+            String request = "Howdy Listener!";
             buffer = request.getBytes();
-            packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName(listenerAddress),
-                    listenerPort);
+            packet = new DatagramPacket(buffer, buffer.length,
+                    InetAddress.getByName(listenerAddress), listenerPort);
             socket.send(packet);
 
-            // Wait for the listener to send a UDP packet
-            socket.receive(packet);
-
             // By now we have made a UDP connection with the listener
-            System.out.println("Made a UDP connection with the listener");
 
             // Send the messages to the listener
             for (int i = 0; i < messages.length; i++) {
-                sendMessage(socket, InetAddress.getByName(listenerAddress), listenerPort, i, messages.length,
+                sendMessage(socket, InetAddress.getByName(listenerAddress), listenerPort, i,
+                        messages.length,
                         messages[i]);
-                Acked = waitForACK(socket, InetAddress.getByName(listenerAddress), listenerPort, i, i + 1);
+                Acked = waitForACK(socket, InetAddress.getByName(listenerAddress),
+                        listenerPort, i, i + 1);
                 if (!Acked) {
+                    System.out.println("Not Acked");
                     i--;
                 }
             }
@@ -108,7 +115,7 @@ public class Talker {
         int start;
         int end;
         // set the initial message to be the number of messages
-        messages[0] = Integer.toString(numMessages);
+        messages[0] = Integer.toString(numMessages - 1);
         for (int i = 1; i < numMessages; i++) {
             // Get the start and end index of the message
             start = (i - 1) * 10;
@@ -124,14 +131,14 @@ public class Talker {
     private static void sendMessage(DatagramSocket socket, InetAddress address, int listenerPort,
             int sequenceNumber, int numMessages, String message) {
         // Make the message frame
-        String frame = Integer.toString(sequenceNumber) + "|" + Integer.toString(numMessages) + "|" + message;
+        String frame = Integer.toString(sequenceNumber) + "|" + Integer.toString(numMessages - 1) + "|" + message;
         // Create a buffer to store the message
         byte[] buffer = frame.getBytes();
         // Create a datagram packet to send the message
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, listenerPort);
         try {
             socket.send(packet);
-            System.out.println("Sent message: " + sequenceNumber + ":" + frame);
+            System.out.println("Sent message: " + ": " + sequenceNumber + " Message :" + frame);
         } catch (Exception e) {
             System.out.println("Error sending message: " + e);
         }
@@ -145,12 +152,12 @@ public class Talker {
             byte[] buffer = new byte[1024];
             // Create a datagram packet to receive the incoming data
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            socket.setSoTimeout(TIMEOUT);
             socket.receive(packet);
             // Get the message from the packet
             String message = new String(packet.getData(), 0, packet.getLength());
             // See what was received
-            int ack = Integer.parseInt(message);
-            // socket.setSoTimeout(TIMEOUT);
+            int ack = Integer.parseInt(message.split("\\s+")[1]);
             if (ack != expectedACK) {
                 System.out.println("Expected ACK: " + expectedACK + " but got: " + ack);
                 return false;
@@ -160,7 +167,7 @@ public class Talker {
             }
         } catch (Exception IOexception) {
             System.out.println("Error waiting for ACK: " + IOexception);
+            return false;
         }
-        return true;
     }
 }

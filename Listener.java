@@ -1,6 +1,7 @@
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.Random;
 
 public class Listener {
     // Requirements for the listener
@@ -17,59 +18,89 @@ public class Listener {
     // string
     public static void main(String[] args) {
         // Check if the user has entered the ports for talker and listener
-        if (args.length != 2) {
-            System.out.println("Usage: java Listener <talker_port> <listener_port>");
+        if (args.length != 3) {
+            System.out.println("Usage: java Listener <talker_port> <listener_port> <talker_address>");
             return;
         }
 
         // Parse args
         int talkerPort = Integer.parseInt(args[0]);
         int listenerPort = Integer.parseInt(args[1]);
+        String talkerAddress = args[2];
 
+        DatagramSocket listenSocket = null;
+        StringBuilder concatenatedMessages = new StringBuilder();
         try {
-            // Create a DatagramSocket for the listener
-            DatagramSocket socket = new DatagramSocket(listenerPort);
+            // Listener should request a UDP connection from the talker by sending a message
+            listenSocket = new DatagramSocket(listenerPort);
 
-            // Request a UDP connection from the talker
-            byte[] requestBuffer = "Requesting Connection".getBytes();
-            DatagramPacket requestPacket = new DatagramPacket(requestBuffer, requestBuffer.length,
-                    InetAddress.getLocalHost(), talkerPort);
-            socket.send(requestPacket);
+            // Send something to the talker for now
+            byte[] requestData = "Howdy Talker!".getBytes();
 
-            // Accept the UDP connection from the talker
-            byte[] receiveBuffer = new byte[1024];
-            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
-            socket.receive(receivePacket);
+            // Test FIX ME IP IS LOCALHOST
+            InetAddress listenerAddress = InetAddress.getByName(talkerAddress);
+            // Backup code if it breaks
+            // InetAddress listenerAddress = InetAddress.getLocalHost()
+            // FIX ME ^^
+            DatagramPacket packet = new DatagramPacket(requestData, requestData.length,
+                    listenerAddress, talkerPort);
+            listenSocket.send(packet);
+            System.out.println("SENT SOMETHING");
 
-            // Extract the number of messages from message 0
-            int numberOfMessages = Integer.parseInt(new String(receivePacket.getData()).trim());
+            // Listner should listen for a talker
+            byte[] recieveData = new byte[1024];
+            DatagramPacket recievePacket = new DatagramPacket(recieveData, recieveData.length);
+            listenSocket.receive(recievePacket);
+            String messageRecieved = new String(recievePacket.getData(), recievePacket.getOffset(),
+                    recievePacket.getLength());
+            System.out.println("Recieved the following from talker: " + messageRecieved);
+            requestData = ("ACK " + 1).getBytes();
+            packet = new DatagramPacket(requestData, requestData.length,
+                    listenerAddress, talkerPort);
+            listenSocket.send(packet);
 
-            // Listen to the talker and send ACK for each message received
-            StringBuilder concatenatedMessages = new StringBuilder();
-            for (int i = 1; i <= numberOfMessages; i++) {
-                socket.receive(receivePacket);
-                String receivedMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
+            // Now recieve the num of messages
+            listenSocket.receive(recievePacket);
+            messageRecieved = new String(recievePacket.getData(), recievePacket.getOffset(),
+                    recievePacket.getLength());
+            int expectedMessages = Integer.parseInt(messageRecieved.split("\\|")[1]);
+            System.out.println("Expecting this many messages: " + expectedMessages);
 
-                // Send ACK for the received message
-                String ackMessage = "ACK " + i;
-                byte[] ackBuffer = ackMessage.getBytes();
-                DatagramPacket ackPacket = new DatagramPacket(ackBuffer, ackBuffer.length, receivePacket.getAddress(),
-                        receivePacket.getPort());
-                socket.send(ackPacket);
-                System.out.println("Received Message " + i + ": " + receivedMessage);
-
-                // Concatenate messages
-                concatenatedMessages.append(receivedMessage);
+            // Now listen as many times as necessary
+            String processedMessage;
+            Random random = new Random();
+            for (int i = 1; i <= expectedMessages; i++) {
+                listenSocket.receive(recievePacket);
+                // Now process the message
+                messageRecieved = new String(recievePacket.getData(), recievePacket.getOffset(),
+                        recievePacket.getLength());
+                processedMessage = messageRecieved.split("\\|")[2];
+                System.out.println("Recieved: " + processedMessage);
+                // Above is working
+                // Now send an ack
+                requestData = ("ACK " + (i + 1)).getBytes();
+                packet = new DatagramPacket(requestData, requestData.length,
+                        listenerAddress, talkerPort);
+                // Now randomly decide to ack or not either generate a 1 or 0
+                int randomDecision = random.nextInt(2);
+                if (randomDecision == 1) {
+                    listenSocket.send(packet);
+                    // Concatenate the message
+                    concatenatedMessages.append(processedMessage);
+                } else {
+                    i--;
+                }
             }
-
-            // Close the connection after receiving all messages
-            socket.close();
-
-            // Concatenate the messages to a string
-            System.out.println("Concatenated Messages: " + concatenatedMessages.toString());
 
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            // Close listenSocket if not closed
+            if (listenSocket != null && !listenSocket.isClosed()) {
+                listenSocket.close();
+            }
         }
+        System.out.println("We have finally finished with a final string of: ");
+        System.out.println(concatenatedMessages);
     }
 }
