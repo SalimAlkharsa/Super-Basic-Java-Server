@@ -2,8 +2,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 
-import javax.xml.crypto.Data;
-
 public class Talker {
     private static final int MAX_LENGTH = 50;
     private static final int TIMEOUT = 2000;
@@ -47,7 +45,6 @@ public class Talker {
         // Wait for a UDP connection from the listener
         try {
             socket = new DatagramSocket(talkerPort);
-            socket.setSoTimeout(TIMEOUT);
             System.out.println("Waiting for a UDP connection from the listener");
 
             // Create a buffer to store incoming data
@@ -153,6 +150,7 @@ public class Talker {
             String message = new String(packet.getData(), 0, packet.getLength());
             // See what was received
             int ack = Integer.parseInt(message);
+            // socket.setSoTimeout(TIMEOUT);
             if (ack != expectedACK) {
                 System.out.println("Expected ACK: " + expectedACK + " but got: " + ack);
                 return false;
