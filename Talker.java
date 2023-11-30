@@ -41,54 +41,50 @@ public class Talker {
 
         // Break up the message into 10 character messages
         String[] messages = processMessage(message);
-        boolean connected = false;
         DatagramSocket socket = null;
-        String listenerAddress = null;
+        boolean Acked = false;
 
         // Wait for a UDP connection from the listener
         try {
-            if (!connected) {
-                socket = new DatagramSocket(talkerPort);
-                socket.setSoTimeout(TIMEOUT);
-                System.out.println("Waiting for a UDP connection from the listener");
+            socket = new DatagramSocket(talkerPort);
+            socket.setSoTimeout(TIMEOUT);
+            System.out.println("Waiting for a UDP connection from the listener");
 
-                // Create a buffer to store incoming data
-                byte[] buffer = new byte[1024];
-                // Create a datagram packet to receive the incoming data
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                // Wait for the listener to send a UDP packet
-                socket.receive(packet);
+            // Create a buffer to store incoming data
+            byte[] buffer = new byte[1024];
+            // Create a datagram packet to receive the incoming data
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            // Wait for the listener to send a UDP packet
+            socket.receive(packet);
 
-                // Get the listener's IP address
-                listenerAddress = packet.getAddress().getHostAddress();
-                System.out.println("Listener's IP address: " + listenerAddress);
+            // Get the listener's IP address
+            String listenerAddress = packet.getAddress().getHostAddress();
+            System.out.println("Listener's IP address: " + listenerAddress);
 
-                // Send a UDP packet to the listener to request a connection
-                String request = "Requesting UDP connection";
-                buffer = request.getBytes();
-                packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName(listenerAddress),
-                        listenerPort);
-                socket.send(packet);
+            // Send a UDP packet to the listener to request a connection
+            String request = "Requesting UDP connection";
+            buffer = request.getBytes();
+            packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName(listenerAddress),
+                    listenerPort);
+            socket.send(packet);
 
-                // Wait for the listener to send a UDP packet
-                socket.receive(packet);
+            // Wait for the listener to send a UDP packet
+            socket.receive(packet);
 
-                // By now we have made a UDP connection with the listener
-                connected = true;
-            } else {
-                System.out.println("Already connected to the listener");
-            }
+            // By now we have made a UDP connection with the listener
+            System.out.println("Made a UDP connection with the listener");
 
             // Send the messages to the listener
             for (int i = 0; i < messages.length; i++) {
                 sendMessage(socket, InetAddress.getByName(listenerAddress), listenerPort, i, messages.length,
                         messages[i]);
-                waitForACK(socket, InetAddress.getByName(listenerAddress), listenerPort, i, i + 1);
+                Acked = waitForACK(socket, InetAddress.getByName(listenerAddress), listenerPort, i, i + 1);
+                if (!Acked) {
+                    i--;
+                }
             }
         } catch (Exception e) {
             System.out.println("Error: " + e);
-        } catch (ACKException t) {
-            System.out.println("Error: " + t);
         } finally {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
@@ -145,7 +141,7 @@ public class Talker {
     }
 
     // Function to wait for an ACK from the listener
-    private static void waitForACK(DatagramSocket socket, InetAddress listenerAddress, int listenerPort,
+    private static boolean waitForACK(DatagramSocket socket, InetAddress listenerAddress, int listenerPort,
             int sequenceNumber, int expectedACK) {
         try {
             // Create a buffer to store the incoming data
@@ -159,13 +155,14 @@ public class Talker {
             int ack = Integer.parseInt(message);
             if (ack != expectedACK) {
                 System.out.println("Expected ACK: " + expectedACK + " but got: " + ack);
-                // Throw an exception called ACKException
-                throw new Exception("ACKException");
+                return false;
             } else {
                 System.out.println("Got ACK: " + ack);
+                return true;
             }
         } catch (Exception IOexception) {
             System.out.println("Error waiting for ACK: " + IOexception);
         }
+        return true;
     }
 }
